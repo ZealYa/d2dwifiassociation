@@ -1,0 +1,357 @@
+## 
+import numpy as np
+import matplotlib.pyplot as plt
+import logging
+import threading
+from time import time
+import concurrent.futures
+
+"""
+
+__author__:
+"""
+
+# have an import for gps coordinate
+
+class _PoissonPP():
+	"""
+	Poisson Point Process (used internally)
+	Attributes:
+
+
+	Methods/Properties:
+
+	Dunders:
+
+
+	"""
+	def __init__(self, lam=0.1, nUE=100, seed=2019):
+		"""
+		Constructor
+
+		init_args:
+
+
+
+		"""
+		self._lam = lam
+		self._nUE = nUE
+		self.seed = seed
+		self._dim = 2
+		self._nParents = None
+		self._locParents = None
+		np.random.seed(seed)
+
+	def __repr__(self):
+		return "Poisson: lambda = {0}, nUE = {1}, seed = {2}, nParents = {3}".format(self.get_lam(), \
+			self.get_nUE(), self.seed, self.get_nParents())
+
+	def get_lam(self):
+		return self._lam
+	def get_nUE(self):
+		return self._nUE
+	def get_dim(self):
+		return self._dim
+	def set_lam(self, lam):
+		self._lam = lam
+	def set_nUE(self, nUE):
+		if isinstance(nUE, int) is not True:
+			raise TypeError('Value should not be float')
+		elif(nUE <= 0):
+			raise ValueError('number of UE should be greater than 0')
+		self._nUE = nUE
+	def set_nParents(self, nParents):
+
+		if isinstance(nParents, int) is not True:
+			raise TypeError('Value should not be float')
+		elif(nParents <= 0):
+			raise ValueError('number of UE should be greater than 0')
+		self._nParents = nParents
+	def get_nParents(self):
+		return self._nParents
+
+	def set_locParents(self, locParents):
+		self._locParents = locParents
+
+	def get_locParents(self):
+		#return self.get_nUE()*self._locParents
+		return self._locParents
+	def make_PP(self):
+		self.set_nParents(np.random.poisson \
+			(self.get_lam() * self.get_nUE()))
+
+		self.set_locParents(np.random.uniform(0, 1, (self.get_nParents(), \
+		 self.get_dim())))
+
+
+class ThomasPP():
+	"""
+	Thomas Point Process (should be used repeatedly during different time instant)
+	
+	Attributes:
+
+
+	Methods/Properties:
+
+	Dunders:
+
+
+	"""
+	def __init__(self, kappa = 0.1, sigma = 0.01, mu = 20, Dx = 100, seed = 2019):
+		"""
+
+		"""
+		self._kappa = kappa
+		self._sigma = sigma
+		self._mu = mu
+		self._Dx = Dx
+		self._seed = seed
+		self._nParents = None
+		self._locParents = None
+		self._nChildren = None
+		self.locChildrenx = None
+		self.locChildreny = None
+		self.locChildren = None
+
+	def set_all(self, kappa = 0.1, sigma = 0.01, mu = 20, Dx = 100, seed = 2019):
+		self.set_kappa(kappa)
+		self.set_sigma(sigma)
+		self.set_mu(mu)
+		self.set_Dx(Dx)
+		self.set_seed(seed)
+
+	def _init_locChildren(self):
+		self.locChildren = np.zeros([sum(self.get_nChildren()), 2])
+	def set_nParents(self, nParents):
+		self._nParents = nParents
+
+	def set_nChidren(self, nChildren):
+		self._nChildren = nChildren
+
+	def get_nParents(self):
+		return self._nParents
+
+	def get_locParents(self):
+		return self._locParents
+	def get_nChildren(self):
+		return self._nChildren
+	def set_nChildren(self, nChildren):
+		self._nChildren = nChildren
+
+	def set_locParents(self, locParents):
+		self._locParents = locParents
+
+	def set_nParents_locParents(self):
+
+		poissonPP = _PoissonPP(self.get_kappa(), self.get_Dx())
+		poissonPP.make_PP()
+		print(poissonPP)
+		self.set_nParents(poissonPP.get_nParents())
+		self.set_locParents(poissonPP.get_locParents())
+
+	def set_locChildren(self, locChildrenx, locChildreny):
+
+		self.locChildren = np.zeros([sum(self.get_nChildren()), 2])
+		self.locChildrenx = locChildrenx
+		self.locChildreny = locChildreny
+		self.locChildren[:, 0] = locChildrenx
+		self.locChildren[:, 1] = locChildreny
+
+
+	def get_kappa(self):
+		"""
+		"""
+		return self._kappa
+
+	def get_sigma(self):
+		return self._sigma
+
+	def get_mu(self):
+		return self._mu
+
+	def get_Dx(self):
+		return self._Dx
+
+	def get_seed(self):
+		return self._seed
+
+	def set_kappa(self, kappa):
+
+		self._kappa = _kappa
+	def set_sigma(self, sigma):
+
+		self._sigma = sigma
+
+	def set_mu(self, mu):
+		self._mu = mu
+
+	def set_Dx(self, Dx):
+		self._Dx = Dx
+
+	def set_seed(self, seed):
+		self._seed = seed
+
+	def __repr__(self):
+		return 'TPP configured as: kappa = {0}, sigma = {1}, \
+		mu = {2}, Dx = {3}, nParents = {4}, nChildren = {5}'.format(self.get_kappa(), \
+			self.get_sigma(), self.get_mu(), self.get_Dx(), self.get_nParents(),\
+			 self.get_nChildren())
+
+	def time_it(func):
+
+		"""
+		A generic timer function
+		"""
+		def f(*args, **kwargs):
+			start_time = time()
+			val = func(*args, **kwargs)
+			end_time = time()
+
+			logging.info("time elapased %fs for function %s", end_time - start_time, func)
+			return val
+		return f
+
+	@time_it
+	def make_TPP_thread(self):
+
+
+		self.set_nParents_locParents()
+		
+
+		#logging.info("set number of parents: %d for the run", self.get_nParents())
+		nChildren = np.random.poisson(self.get_mu(), self.get_nParents())
+		self.set_nChildren(nChildren)
+		self._init_locChildren()
+		with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+			executor.map(self.find_children_location_tf, range(2))
+
+
+
+	
+
+	
+	def find_children_location_tf(self, index):
+
+		"""
+		"""
+
+		sumChildren = sum(self.get_nChildren())
+
+		logging.info('Inside thread %d with %d children', 
+			index, sumChildren)
+		nChildren = self.get_nChildren()
+
+
+		
+		
+		children_coord = np.random.normal(0, self.get_sigma(), sumChildren)
+		parent_coord = self.get_locParents()
+		parent_coord_ind = parent_coord[:, index]
+
+
+		#logging.info("Parent coorninate set in Thread %d", index)
+
+		coord0 = np.repeat(parent_coord_ind, self.get_nChildren())
+
+		children_coord = coord0 + children_coord 
+
+
+
+		self.locChildren[:, index] = children_coord
+		
+
+
+		
+
+	@time_it
+	def make_TPP(self):
+		"""
+		"""
+
+
+		self.set_nParents_locParents()
+		
+
+		logging.info("set number of parents: %d for the run", self.get_nParents())
+		nChildren = np.random.poisson(self.get_mu(), self.get_nParents())
+		self.set_nChildren(nChildren)
+
+		locParents = self.get_locParents()
+		locParentx = locParents[:, 0]
+
+
+		locParenty = locParents[:, 1]
+
+		sumChildren = sum(nChildren)
+
+		#logging.info("total number of children %d", sumChildren, "with groups: ", nChildren)
+		locChildrenx = np.random.normal(0, self.get_sigma(), sumChildren)
+		locChildreny = np.random.normal(0, self.get_sigma(), sumChildren)
+
+		
+		
+		
+		# some temporary variable 
+		xx0 = np.repeat(locParentx, nChildren)
+		yy0 = np.repeat(locParenty, nChildren)
+
+		locChildrenx = xx0 + locChildrenx
+		locChildreny = yy0 + locChildreny
+
+		self.set_locChildren(locChildrenx, locChildreny)
+
+
+	def start(self):
+		"""
+			run threaded or non threaded model
+		"""
+
+		if self._Dx * self._mu < 100_000:
+
+			self.make_TPP()
+		else:
+			self.make_TPP_thread()
+
+
+
+
+
+
+
+
+
+
+def Thomas(kappa, sigma, mu, Dx, seed):
+	"""
+
+	args:
+
+	returns:
+
+	raises:
+
+	"""
+	pass
+logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+kappa = 0.1
+sigma = 0.01
+mu = 20
+Dx = 100_00
+seed = 2019
+
+tpp = ThomasPP(kappa, sigma, mu, Dx, seed)
+#tpp.set_all(kappa, sigma, mu, Dx, seed)
+
+tpp.start()
+
+print(tpp)
+
+plt.scatter(tpp.get_Dx()*tpp.locChildren[:, 0],tpp.get_Dx()*tpp.locChildren[:, 1], edgecolor='b', \
+facecolor='b', alpha=0.5);
+plt.xlabel("x"); plt.ylabel("y");
+plt.axis('equal');
+
+
+#plt.plot(tpp._locParents[:, 0], tpp._locParents[:, 1])
+
+plt.show()
