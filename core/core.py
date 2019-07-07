@@ -7,9 +7,15 @@ from time import time
 import concurrent.futures
 
 """
+core.py: Simulation of Thomas Point Process
 
-__author__:
 """
+__author__: Subharthi Banerjee
+__license__ = "GPL"
+__version__ = "1.0.1"
+__maintainer__ = "Subharthi Banerjee"
+__email__ = "sbanerjee15@huskers.unl.edu"
+__status__ = "Development"
 
 # have an import for gps coordinate
 
