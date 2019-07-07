@@ -1,10 +1,4 @@
-## 
-import numpy as np
-import matplotlib.pyplot as plt
-import logging
-import threading
-from time import time
-import concurrent.futures
+
 
 """
 core.py: Simulation of Thomas Point Process
@@ -16,6 +10,19 @@ __version__ = "1.0.1"
 __maintainer__ = "Subharthi Banerjee"
 __email__ = "sbanerjee15@huskers.unl.edu"
 __status__ = "Development"
+
+
+## 
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import logging
+import threading
+from time import time
+import concurrent.futures
+import matplotlib.animation as animation
+
+
 
 # have an import for gps coordinate
 
@@ -118,6 +125,8 @@ class ThomasPP():
 		self.locChildrenx = None
 		self.locChildreny = None
 		self.locChildren = None
+		self.parent_child_dict = {}
+		self.sumChildren = None
 
 	def set_all(self, kappa = 0.1, sigma = 0.01, mu = 20, Dx = 100, seed = 2019):
 		self.set_kappa(kappa)
@@ -221,13 +230,13 @@ class ThomasPP():
 	def make_TPP_thread(self):
 
 
-		self.set_nParents_locParents()
+		#self.set_nParents_locParents()
 		
 
 		#logging.info("set number of parents: %d for the run", self.get_nParents())
-		nChildren = np.random.poisson(self.get_mu(), self.get_nParents())
-		self.set_nChildren(nChildren)
-		self._init_locChildren()
+		#nChildren = np.random.poisson(self.get_mu(), self.get_nParents())
+		#self.set_nChildren(nChildren)
+		#self._init_locChildren()
 		with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
 			executor.map(self.find_children_location_tf, range(2))
 
@@ -275,37 +284,44 @@ class ThomasPP():
 		"""
 
 
-		self.set_nParents_locParents()
-		
-
-		logging.info("set number of parents: %d for the run", self.get_nParents())
-		nChildren = np.random.poisson(self.get_mu(), self.get_nParents())
-		self.set_nChildren(nChildren)
-
 		locParents = self.get_locParents()
 		locParentx = locParents[:, 0]
 
 
 		locParenty = locParents[:, 1]
 
-		sumChildren = sum(nChildren)
-
 		#logging.info("total number of children %d", sumChildren, "with groups: ", nChildren)
-		locChildrenx = np.random.normal(0, self.get_sigma(), sumChildren)
-		locChildreny = np.random.normal(0, self.get_sigma(), sumChildren)
+		locChildrenx = np.random.normal(0, self.get_sigma(), self.sumChildren)
+		locChildreny = np.random.normal(0, self.get_sigma(), self.sumChildren)
 
 		
 		
 		
 		# some temporary variable 
-		xx0 = np.repeat(locParentx, nChildren)
-		yy0 = np.repeat(locParenty, nChildren)
+		xx0 = np.repeat(locParentx, self.get_nChildren())
+		yy0 = np.repeat(locParenty, self.get_nChildren())
+
+		#id0 = np.repeat(self.get_nParents(), self.get_nChildren())
 
 		locChildrenx = xx0 + locChildrenx
 		locChildreny = yy0 + locChildreny
 
 		self.set_locChildren(locChildrenx, locChildreny)
 
+
+
+	def init(self):
+		self.set_nParents_locParents()
+		
+
+		logging.info("Initializing number of parents: %d for the run", self.get_nParents())
+		nChildren = np.random.poisson(self.get_mu(), self.get_nParents())
+		self.set_nChildren(nChildren)
+		self._init_locChildren()
+		
+
+		sumChildren = sum(nChildren)
+		self.sumChildren = sumChildren
 
 	def start(self):
 		"""
@@ -318,46 +334,81 @@ class ThomasPP():
 		else:
 			self.make_TPP_thread()
 
+	def run(self):
+		"""
+		"""
+		np.random.seed()
+		self.start()
+		return self.locChildren
 
 
 
-
-
-
-
-
-
-def Thomas(kappa, sigma, mu, Dx, seed):
+class UpdateTPP():
 	"""
-
-	args:
-
-	returns:
-
-	raises:
-
 	"""
-	pass
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
-kappa = 0.1
-sigma = 0.01
-mu = 20
-Dx = 100_00
-seed = 2019
+	def __init__(self, tpp):
+		self.tpp = tpp
+		self.fig, self.ax = plt.subplots()
+		self.scat = self.ax.scatter([], [], edgecolor='b', \
+	facecolor='b', alpha=0.5)
+		
 
-tpp = ThomasPP(kappa, sigma, mu, Dx, seed)
-#tpp.set_all(kappa, sigma, mu, Dx, seed)
+		self.ax.set_xlim(0, self.tpp.get_Dx())
+		self.ax.set_ylim(0, self.tpp.get_Dx())
+		self.ax.grid(True)
+		self.ani = animation.FuncAnimation(self.fig, self, interval=100, 
+                                          init_func=self.init, blit=True)
 
-tpp.start()
+	def __call__(self, i):
 
-print(tpp)
+		self.tpp.run()
 
-plt.scatter(tpp.get_Dx()*tpp.locChildren[:, 0],tpp.get_Dx()*tpp.locChildren[:, 1], edgecolor='b', \
-facecolor='b', alpha=0.5);
-plt.xlabel("x"); plt.ylabel("y");
-plt.axis('equal');
+		self.scat.set_offsets(self.tpp.get_Dx()*self.tpp.locChildren[:, :2])
+		logging.info("Logging at %d", i)
+		return self.scat,
 
 
-#plt.plot(tpp._locParents[:, 0], tpp._locParents[:, 1])
+	def init(self):
+		#self.ax.set_ylim(-1.1, 1.1)
+	    #self.ax.set_xlim(0, 10)
+	    #del xdata[:]
+	    #del ydata[:]
+	    self.scat.set_offsets(self.tpp.get_Dx()*self.tpp.locChildren[:, :2])
+	    logging.info("Initiated plot")
+	    return self.scat,
 
-plt.show()
+
+
+
+if __name__ == '__main__':
+
+	os.system('clear')
+	logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+	kappa = 0.1
+	sigma = 0.01
+	mu = 20
+	Dx = 10_00
+	seed = 2019
+
+	tpp = ThomasPP(kappa, sigma, mu, Dx, seed)
+	#tpp.set_all(kappa, sigma, mu, Dx, seed)
+
+	tpp.init()
+	tpp.start()
+
+	print(tpp)
+
+	
+	
+	#plt.scatter(tpp.get_Dx()*tpp.locChildren[:, 0],tpp.get_Dx()*tpp.locChildren[:, 1], edgecolor='b', \
+	#facecolor='b', alpha=0.5)
+	#plt.xlabel("x"); plt.ylabel("y");
+	#plt.axis('equal');
+
+	logging.info("Animation started")
+	up = UpdateTPP(tpp)
+	plt.show()
+	logging.info("Animation finished")
+	#plt.plot(tpp._locParents[:, 0], tpp._locParents[:, 1])
+
+	
